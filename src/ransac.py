@@ -1,50 +1,58 @@
+'''
+Create date : 2021/12/16.
+Update      : 2021/12/17.
+Writer      : Nishimura Kairi
+'''
+
 import numpy as np
 
-def ransac(x, y, z, roll, pitch, yaw,
-           data, U, eta_0,  k_max=100, t=2.0):
+def ransac(x, y, z, roll, pitch, yaw, data, k_max=100):
     k = 0
-    I_max = 0
     n_sample = 3 # サンプル数
-    num_inlier = 300
+    num_inlier = 100 # インライア数の設定 -> 更新処理かける
     while k < k_max:
         ### データ長さに対して n_sample 個のインデックスを取得 ###
-        theta_k = np.random.choice(len(data), n_sample, replace=False)
-        # ### モデルの ###
-        # x_set = x[theta_k]
-        # y_set = y[theta_k]
-        # z_set = z[theta_k]
-        # roll_set = roll[theta_k]
-        # pitch_set = pitch[theta_k]
-        # yaw_set = yaw[theta_k]
+        theta_k = np.random.choice(len(x), n_sample, replace=False)
 
-        S = []
-        for theta in theta_k:
-            S.append([x[theta], y[theta], z[theta], roll[theta], pitch[theta], yaw[theta]])
+        ### 平面の方程式算出 ###
+        p_t, q_t, r_t, d_t= calc_plane_equation(x, y, z, theta_k)
+        p_r, q_r, r_r, d_r = calc_plane_equation(roll, pitch, yaw, theta_k)
 
-        a1, a2, a3, a4, a5, a6, observe_val = gauss_j(S, len(data))
-
+        ### 全ての点に対してフィットしているか探索 ###
         err = 0.3
         cnt = 0
-        for x, y, z, roll, pitch, yaw in data:
-            get_val = a1*x + a2*y + a3*z + a4*roll + a5*pitch + a6*yaw
-            if err > abs(get_val - observe_val):
+        inlier_points = []
+        for x, y, z, roll, pitch, yaw in x, y, z, roll, pitch, yaw:
+            ### 並進・回転の観測値を取得 ###
+            observe_val_t = calc_observe_val(x, y, z, p_t, q_t, r_t, d_t)
+            observe_val_r = calc_observe_val(roll, pitch, yaw, p_r, q_r, r_r, d_r)
+            ### 閾値判断 ###
+            if err > abs(observe_val_t) and err > abs(observe_val_r):
+                inlier_points.append([x, y, z, roll, pitch, yaw])
                 cnt += 1
+                ### カウント数が設定したインライア数を超えている場合は更新 ###
                 if cnt >= num_inlier:
-                    cnt = num_inlier
+                    num_inlier = cnt
+                    best_inlier_points = inlier_points
 
+        ### インライアが多いサンプリング点を返す ###
+        return best_inlier_points
 
-### ガウス・ジョルダン法による方程式の解算出 ###
-def gauss_j(S, k):
-    for n in range(k+1):
-        pivot = S[n][n]
-        for i in range(k+2):
-            S[n][i] /= pivot
+### 平面の係数算出関数 ###
+def calc_plane_equation(x, y, z, theta_k):
+        x0, y0, z0 = x[theta_k[0]], y[theta_k[0]], y[theta_k[0]]
+        x1, y1, z1 = y[theta_k[1]], y[theta_k[1]], y[theta_k[1]]
+        x2, y2, z2 = z[theta_k[2]], z[theta_k[2]], z[theta_k[2]]
+        ### 外積計算 ###
+        p = (y1-y0)*(z2-z0) - (z1-z0)*(y2-y0)
+        q = (z1-z0)*(x2-x0) - (x1-x0)*(z2-z0)
+        r = (x1-x0)*(y2-y0) - (y1-y0)*(x2-x0)
 
-        for i in range(k+1):
-            if i != n:
-                d = S[i][n]
-                for j in range(k+2):
-                    S[i][j] -= d * S[n][j]
-                    
-    for i in range(k+1):
-        print(S[i][k+1])
+        d = -p*x0 - q*y0 - r*z0 # 平面の方程式
+
+        return p, q, r, d
+
+### 観測値算出関数 ###
+def calc_observe_val(x, y, z, p, q, r, d):
+    observe_val = p * x + q * y + r * z + d
+    return observe_val
