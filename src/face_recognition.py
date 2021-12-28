@@ -1,6 +1,6 @@
 '''
 Create date : 2021/12/10.
-Update      : 2021/12/12.
+Update      : 2021/12/14.
 Writer      : Nishimura Kairi
 '''
 
@@ -27,7 +27,8 @@ cap = cv2.VideoCapture(DEVICE_ID)
 while True:
     end_flag , frame = cap.read()
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    faces = face_classifier.detectMultiScale(frame, minSize=(100,100))
+    faces = face_classifier.detectMultiScale(frame, minSize=(50,50))
+    eyes = eye_classifier.detectMultiScale(frame)
     # target drowing
     for x, y, w, h in faces:
         gray_frame = frame[y:y+h, x:x+w]
